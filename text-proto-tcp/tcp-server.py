@@ -13,36 +13,91 @@ class State:
     def add(self, key, value):
         with self.lock:
             self.data[key] = value
-        return f"{key} added"
+        return "OK record add"
 
     def get(self, key):
         with self.lock:
-            return self.data.get(key, "Key not found")
+            if key in self.data:
+                return f"DATA {self.data[key]}"
+            return "ERROR invalid key"
 
     def remove(self, key):
         with self.lock:
             if key in self.data:
                 del self.data[key]
-                return f"{key} removed"
-            return "Key not found"
+                return "OK value deleted"
+            return "ERROR invalid key"
+
+    def list(self):
+        with self.lock:
+            if not self.data:
+                return "DATA|"
+            items = ",".join(f"{k}={v}" for k,v in self.data.items())
+            return f"DATA|{items}"
+
+    def count(self):
+        with self.lock:
+            return f"DATA {len(self.data)}"
+
+    def clear(self):
+        with self.lock:
+            self.data.clear()
+        return "all data deleted"
+
+    def update(self, key, value):
+        with self.lock:
+            if key in self.data:
+                self.data[key] = value
+                return "Data updated"
+            return "ERROR invalid key"
+
+    def pop(self, key):
+        with self.lock:
+            if key in self.data:
+                value = self.data.pop(key)
+                return f"DATA {value}"
+            return "ERROR invalid key"
+
 
 state = State()
 
+
 def process_command(command):
     parts = command.split()
-    if len(parts) < 2:
-        return "Invalid command format"
 
-    cmd, key = parts[0], parts[1]
-    
-    if cmd == "add" and len(parts) > 2:
-        return state.add(key, ' '.join(parts[2:]))
-    elif cmd == "get" and len(parts) == 2:
-        return state.get(key)
-    elif cmd == "remove" and len(parts) == 2:
-        return state.remove(key)
-    
-    return "Invalid command"
+    if not parts:
+        return "ERROR invalid command"
+
+    cmd = parts[0].upper()
+
+    if cmd == "ADD" and len(parts) >= 3:
+        return state.add(parts[1], ' '.join(parts[2:]))
+
+    elif cmd == "GET" and len(parts) == 2:
+        return state.get(parts[1])
+
+    elif cmd == "REMOVE" and len(parts) == 2:
+        return state.remove(parts[1])
+
+    elif cmd == "LIST":
+        return state.list()
+
+    elif cmd == "COUNT":
+        return state.count()
+
+    elif cmd == "CLEAR":
+        return state.clear()
+
+    elif cmd == "UPDATE" and len(parts) >= 3:
+        return state.update(parts[1], ' '.join(parts[2:]))
+
+    elif cmd == "POP" and len(parts) == 2:
+        return state.pop(parts[1])
+
+    elif cmd == "QUIT":
+        return "Bye"
+
+    return "ERROR unknown command"
 
 def handle_client(client_socket):
     with client_socket:
@@ -58,6 +113,11 @@ def handle_client(client_socket):
                 response_data = f"{len(response)} {response}".encode('utf-8')
                 client_socket.sendall(response_data)
 
+                if command.upper() == "QUIT":
+                    response = "Bye"
+                    response_data = f"{len(response)} {response}".encode('utf-8')
+                    client_socket.sendall(response_data)
+                    break
             except Exception as e:
                 client_socket.sendall(f"Error: {str(e)}".encode('utf-8'))
                 break

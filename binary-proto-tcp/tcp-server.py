@@ -24,40 +24,95 @@ class State:
   def __init__(self):
     self.resources = {}
     self.lock = threading.Lock()
-  def add(self, key, resource):
-    self.lock.acquire()
-    self.resources[key] = resource
-    self.lock.release()
-  def remove(self, key):
-    self.lock.acquire()
-    self.resources.pop(key, None)
-    self.lock.release()
-  def get(self, key):
-    if key in self.resources:
-      return self.resources[key]
-    else:
-      return None
 
+  def add(self, key, resource):
+    with self.lock:
+      self.resources[key] = resource
+    return "OK record add"
+
+  def remove(self, key):
+    with self.lock:
+      if key in self.resources:
+        del self.resources[key]
+        return "OK value deleted"
+      return "ERROR invalid key"
+
+  def get(self, key):
+    with self.lock:
+      if key in self.resources:
+        return f"DATA {self.resources[key]}"
+      return "ERROR invalid key"
+
+  def list(self):
+    with self.lock:
+      if not self.resources:
+        return "DATA|"
+      items = ",".join(f"{k}={v}" for k,v in self.resources.items())
+      return f"DATA|{items}"
+
+  def count(self):
+    with self.lock:
+      return f"DATA {len(self.resources)}"
+
+  def clear(self):
+    with self.lock:
+      self.resources.clear()
+    return "all data deleted"
+
+  def update(self, key, value):
+    with self.lock:
+      if key in self.resources:
+        self.resources[key] = value
+        return "Data updated"
+      return "ERROR invalid key"
+
+  def pop(self, key):
+    with self.lock:
+      if key in self.resources:
+        value = self.resources.pop(key)
+        return f"DATA {value}"
+      return "ERROR invalid key"
 state = State()
 
 def process_command(data):
   payload = data[1:]
-  stream = io.BytesIO(payload)  
+  stream = io.BytesIO(payload)
   request = pickle.load(stream)
-  payload = 'command not recognized, doing nothing'
-  if request.command == 'add':
-    state.add(request.key, request.resource)
-    payload = f'{request.key} added'
-  elif request.command == 'remove':
-    state.remove(request.key)
-    payload = f'{request.key} removed'
-  elif request.command == 'get':
+
+  cmd = request.command.upper()
+  payload = "ERROR unknown command"
+
+  if cmd == "ADD":
+    payload = state.add(request.key, request.resource)
+
+  elif cmd == "REMOVE":
+    payload = state.remove(request.key)
+
+  elif cmd == "GET":
     payload = state.get(request.key)
-    if not payload:
-      payload = 'key was not found'
+
+  elif cmd == "LIST":
+    payload = state.list()
+
+  elif cmd == "COUNT":
+    payload = state.count()
+
+  elif cmd == "CLEAR":
+    payload = state.clear()
+
+  elif cmd == "UPDATE":
+    payload = state.update(request.key, request.resource)
+
+  elif cmd == "POP":
+    payload = state.pop(request.key)
+
+  elif cmd == "QUIT":
+    payload = "Bye"
+
   stream = io.BytesIO()
   pickle.dump(Response(payload), stream)
   serialized_payload = stream.getvalue()
+
   payload_length = len(serialized_payload) + 1
   return payload_length.to_bytes(1, byteorder='big') + serialized_payload
 
