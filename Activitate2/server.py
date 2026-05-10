@@ -5,6 +5,8 @@ PORT        = 9999
 BUFFER_SIZE = 1024
 
 clienti_conectati = {}
+mesaje = {}          # id -> { "text": ..., "autor": ... }
+urmator_id = 1
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server_socket.bind((HOST, PORT))
@@ -30,29 +32,57 @@ while True:
                 raspuns = "EROARE: Esti deja conectat la server."
             else:
                 clienti_conectati[adresa_client] = True
-                nr_clienti = len(clienti_conectati)
-                raspuns = f"OK: Conectat cu succes. Clienti activi: {nr_clienti}"
-                print(f"[SERVER] Client nou conectat: {adresa_client}")
+                raspuns = f"OK: Conectat. Clienti activi: {len(clienti_conectati)}"
 
         elif comanda == 'DISCONNECT':
             if adresa_client in clienti_conectati:
                 del clienti_conectati[adresa_client]
-                raspuns = "OK: Deconectat cu succes. La revedere!"
-                print(f"[SERVER] Client deconectat: {adresa_client}")
+                raspuns = "OK: Deconectat cu succes."
             else:
-                raspuns = "EROARE: Nu esti conectat la server."
+                raspuns = "EROARE: Nu esti conectat."
 
         elif comanda == 'PUBLISH':
-            raspuns = "EROARE: Comanda PUBLISH nu este inca implementata."
+            if adresa_client not in clienti_conectati:
+                raspuns = "EROARE: Nu esti conectat."
+            elif not argumente.strip():
+                raspuns = "EROARE: Mesajul nu poate fi gol."
+            else:
+                mesaje[urmator_id] = {
+                    "text": argumente,
+                    "autor": adresa_client
+                }
+                raspuns = f"OK: Mesaj publicat cu ID={urmator_id}"
+                urmator_id += 1
 
         elif comanda == 'DELETE':
-            raspuns = "EROARE: Comanda DELETE nu este inca implementata."
+            if adresa_client not in clienti_conectati:
+                raspuns = "EROARE: Nu esti conectat."
+            elif not argumente.isdigit():
+                raspuns = "EROARE: ID invalid."
+            else:
+                id_mesaj = int(argumente)
+
+                if id_mesaj not in mesaje:
+                    raspuns = "EROARE: ID inexistent."
+                elif mesaje[id_mesaj]["autor"] != adresa_client:
+                    raspuns = "EROARE: Nu poti sterge mesajul altui utilizator."
+                else:
+                    del mesaje[id_mesaj]
+                    raspuns = f"OK: Mesajul {id_mesaj} a fost sters."
 
         elif comanda == 'LIST':
-            raspuns = "EROARE: Comanda LIST nu este inca implementata."
+            if adresa_client not in clienti_conectati:
+                raspuns = "EROARE: Nu esti conectat."
+            elif not mesaje:
+                raspuns = "Nu exista mesaje."
+            else:
+                lista = []
+                for id_mesaj, info in mesaje.items():
+                    lista.append(f"{id_mesaj}: {info['text']}")
+                raspuns = "\n".join(lista)
 
         else:
-            raspuns = f"EROARE: Comanda '{comanda}' este necunoscuta. Comenzi valide: CONNECT, DISCONNECT, PUBLISH, DELETE, LIST"
+            raspuns = f"EROARE: Comanda '{comanda}' necunoscuta."
 
         server_socket.sendto(raspuns.encode('utf-8'), adresa_client)
         print(f"[TRIMIS]  Catre {adresa_client}: '{raspuns}'")

@@ -22,17 +22,8 @@ def trimite_comanda(mesaj: str) -> str:
 
 
 print("=" * 55)
-print("  CLIENT UDP - Seminar 9")
+print("  CLIENT UDP")
 print("=" * 55)
-print("  Comenzi disponibile:")
-print("    CONNECT              - conectare la server")
-print("    DISCONNECT           - deconectare de la server")
-print("    PUBLISH <mesaj>      - publicare mesaj")
-print("    DELETE <id>          - stergere mesaj dupa ID")
-print("    LIST                 - afisare toate mesajele")
-print("    EXIT                 - inchidere client")
-print("=" * 55)
-print()
 
 while True:
     try:
@@ -64,20 +55,39 @@ while True:
             este_conectat = False
 
     elif comanda == 'PUBLISH':
+        if not este_conectat:
+            print("EROARE: Nu esti conectat.")
+            continue
+
+        if len(parti) < 2 or not parti[1].strip():
+            print("EROARE: Trebuie sa furnizezi un mesaj.")
+            continue
+
         raspuns = trimite_comanda(intrare)
         print(raspuns)
 
     elif comanda == 'DELETE':
+        if not este_conectat:
+            print("EROARE: Nu esti conectat.")
+            continue
+
+        if len(parti) < 2 or not parti[1].isdigit():
+            print("EROARE: ID invalid.")
+            continue
+
         raspuns = trimite_comanda(intrare)
         print(raspuns)
 
     elif comanda == 'LIST':
+        if not este_conectat:
+            print("EROARE: Nu esti conectat.")
+            continue
+
         raspuns = trimite_comanda(intrare)
         print(raspuns)
 
     else:
-        print(f"Comanda '{comanda}' nu este recunoscuta de client.")
-        print("Comenzi valide: CONNECT, DISCONNECT, PUBLISH, DELETE, LIST, EXIT")
+        print("Comanda necunoscuta.")
 
 client_socket.close()
-print("Socket inchis. La revedere!")
+print("Socket inchis.")
